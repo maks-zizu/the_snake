@@ -14,6 +14,14 @@ DOWN = (0, 1)
 LEFT = (-1, 0)
 RIGHT = (1, 0)
 
+# Словарь для соответствия клавиш новым направлениям
+KEY_TO_DIRECTION = {
+    pygame.K_UP: UP,
+    pygame.K_DOWN: DOWN,
+    pygame.K_LEFT: LEFT,
+    pygame.K_RIGHT: RIGHT,
+}
+
 # Цвет фона - черный:
 BOARD_BACKGROUND_COLOR = (0, 0, 0)
 
@@ -85,7 +93,6 @@ class Snake(GameObject):
         new_head_position = ((head_x + dir_x * GRID_SIZE) % SCREEN_WIDTH,
                              (head_y + dir_y * GRID_SIZE) % SCREEN_HEIGHT)
         self.positions.insert(0, new_head_position)
-
         if len(self.positions) > self.length:
             self.last = self.positions.pop()
         else:
@@ -116,13 +123,11 @@ class Apple(GameObject):
     def randomize_position(self, snake_positions=None):
         """Определяет случайную позицию яблока на поле."""
         while True:
-            rand_x = randint(0, GRID_WIDTH - 1)
-            rand_y = randint(0, GRID_HEIGHT - 1)
-            new_pos = (rand_x * GRID_SIZE, rand_y * GRID_SIZE)
-            # Если список позиций змейки не задан или новая позиция яблока
-            # не пересекается со змейкой — выходим
-            if not snake_positions or new_pos not in snake_positions:
-                self.position = new_pos
+            random_x = randint(0, GRID_WIDTH - 1)
+            random_y = randint(0, GRID_HEIGHT - 1)
+            new_position = (random_x * GRID_SIZE, random_y * GRID_SIZE)
+            if not snake_positions or new_position not in snake_positions:
+                self.position = new_position
                 break
 
     def draw(self):
@@ -132,31 +137,41 @@ class Apple(GameObject):
 
 def handle_keys(snake):
     """Обрабатывает события ввода с клавиатуры и задаёт новое направление."""
-    key_to_direction = {
-        pygame.K_UP: UP,
-        pygame.K_DOWN: DOWN,
-        pygame.K_LEFT: LEFT,
-        pygame.K_RIGHT: RIGHT,
-    }
-
     for event in pygame.event.get():
-        """
-            !!! try ... except и кастомное исключениe,
-            не позволяют пройти автотесты !!!
-        """
         if event.type == pygame.QUIT:
             sys.exit()
         elif event.type == pygame.KEYDOWN:
-            # Соответствует ли нажатая клавиша возможному направлению
-            new_direction = key_to_direction.get(event.key)
+            new_direction = KEY_TO_DIRECTION.get(event.key)
             if new_direction:
-                # Проверяем, что новое направление не противоположно текущему
-                current_direction = snake.direction
-                if (new_direction[0] != -current_direction[0]
-                        and new_direction[1] != -current_direction[1]):
+                current_x, current_y = snake.direction
+                new_x, new_y = new_direction
+                if new_x != -current_x and new_y != -current_y:
                     snake.next_direction = new_direction
             elif event.key == pygame.K_ESCAPE:
                 sys.exit()
+
+
+def check_collisions(snake, apple):
+    """Проверяет столкновения змейки с яблоком и собой."""
+    head_position = snake.get_head_position()
+
+    # Проверка столкновения с яблоком
+    if head_position == apple.position:
+        snake.length += 1
+        apple.randomize_position(snake.positions)
+
+    # Проверка столкновения со своим телом
+    if head_position in snake.positions[1:]:
+        snake.reset()
+        apple.randomize_position(snake.positions)
+
+
+def update_screen(snake, apple):
+    """Очищает экран и отрисовывает объекты."""
+    screen.fill(BOARD_BACKGROUND_COLOR)
+    snake.draw()
+    apple.draw()
+    pygame.display.update()
 
 
 def main():
@@ -166,37 +181,12 @@ def main():
     apple = Apple(snake_positions=snake.positions)
 
     while True:
-        # Ограничиваем FPS
         clock.tick(SPEED)
-        # 1. Сначала обрабатываем нажатия
         handle_keys(snake)
-        # 2. Обновляем направление
         snake.update_direction()
-        # 3. Двигаем змейку
         snake.move()
-
-        # Сохраним позицию головы змейки в переменную,
-        # чтобы не вызывать get_head_position() несколько раз
-        head_position = snake.get_head_position()
-
-        # 4. Проверяем столкновение с яблоком
-        if head_position == apple.position:
-            snake.length += 1
-            apple.randomize_position(snake.positions)
-
-        # 5. Проверяем столкновение со своим телом
-        if head_position in snake.positions[1:]:
-            screen.fill(BOARD_BACKGROUND_COLOR)
-            snake.reset()
-            apple.randomize_position(snake.positions)
-
-        # Очищаем экран и отрисовываем свежую картинку
-        screen.fill(BOARD_BACKGROUND_COLOR)
-        snake.draw()
-        apple.draw()
-
-        # 6. Обновляем экран
-        pygame.display.update()
+        check_collisions(snake, apple)
+        update_screen(snake, apple)
 
 
 if __name__ == '__main__':
